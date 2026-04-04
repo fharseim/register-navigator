@@ -27,8 +27,7 @@ export const mockCompanies: Company[] = [
   { id: "7", name: "Earlybird Venture Capital GmbH & Co. KG", city: "München", court: "AG München", registerNumber: "HRA 89456", registerType: "HRA", status: "aktiv" },
   { id: "8", name: "Rocket Internet SE", city: "Berlin", court: "AG Charlottenburg", registerNumber: "HRB 165662 B", registerType: "HRB", status: "aktiv" },
   { id: "9", name: "N26 GmbH", city: "Berlin", court: "AG Charlottenburg", registerNumber: "HRB 177479 B", registerType: "HRB", status: "aktiv" },
-  { id: "10", name: "FlixMobility GmbH", city: "München", court: "AG München", registerNumber: "HRB 197
-620", registerType: "HRB", status: "aktiv" },
+  { id: "10", name: "FlixMobility GmbH", city: "München", court: "AG München", registerNumber: "HRB 197620", registerType: "HRB", status: "aktiv" },
   { id: "11", name: "Celonis SE", city: "München", court: "AG München", registerNumber: "HRB 238327", registerType: "HRB", status: "aktiv" },
   { id: "12", name: "Personio SE & Co. KG", city: "München", court: "AG München", registerNumber: "HRA 110055", registerType: "HRA", status: "aktiv" },
   { id: "13", name: "Trade Republic Bank GmbH", city: "Berlin", court: "AG Charlottenburg", registerNumber: "HRB 205340 B", registerType: "HRB", status: "aktiv" },
