@@ -46,7 +46,7 @@ export default function CompanySearch({ onSelect }: CompanySearchProps) {
         name: r.name,
         city: r.city,
         court: r.court,
-        register_number: r.register_number
+        register_number: r.register_number,
         legal_form: r.legal_form,
         status: r.status || "aktiv",
       }));
