@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     const { query } = await req.json();
     if (!query || query.trim().length < 2) {
       return new Response(
-        JSON.stringify({ results: [] }),
+        JSON.stringify({ companies: [] }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ results: results.slice(0, 20) }),
+      JSON.stringify({ companies: results.slice(0, 20) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
