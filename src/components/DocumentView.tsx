@@ -1,155 +1,201 @@
-import { useState } from "react";
-import { FileText, Download, Package, ChevronDown, ChevronRight, ArrowLeft, Paperclip } from "lucide-react";
-import { Company, RegisterDocument, getDocumentsForCompany } from "@/data/mockCompanies";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import { FileText, Download, ArrowLeft, Loader2, AlertCircle, CheckSquare, Square } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Company } from "./CompanySearch";
+
+interface Document {
+  id: string;
+  label: string;
+  type: string;
+  meta: string;
+  url: string;
+}
 
 interface DocumentViewProps {
   company: Company;
   onBack: () => void;
 }
 
-const statusColors: Record<Company["status"], string> = {
-  aktiv: "bg-success/10 text-success",
-  aufgelöst: "bg-warning/10 text-warning",
-  gelöscht: "bg-destructive/10 text-destructive",
-  "in Liquidation": "bg-warning/10 text-warning",
-  "Insolvenz eröffnet": "bg-destructive/10 text-destructive",
-};
-
 export default function DocumentView({ company, onBack }: DocumentViewProps) {
-  const documents = getDocumentsForCompany(company.id);
-  const [selected, setSelected] = useState<Set<string>>(() => {
-    const s = new Set<string>();
-    documents.forEach(d => {
-      s.add(d.id);
-      if (d.subDocuments?.[0]) s.add(d.subDocuments[0].id);
-    });
-    return s;
-  });
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(documents.filter(d => d.subDocuments).map(d => d.id)));
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [source, setSource] = useState<string>("");
 
-  const toggleDoc = (id: string) => {
-    setSelected(prev => {
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("fetch-documents", {
+          body: {
+            companyId: company.id,
+            court: company.court || "",
+            registerNumber: company.register_number || "",
+          },
+        });
+        if (fnError) throw fnError;
+        if (!cancelled) {
+          setDocuments(data?.documents || []);
+          setSource(data?.source || "");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("fetch-documents error:", err);
+          setError("Dokumente konnten nicht geladen werden. Bitte versuche es erneut.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [company]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const toggleAll = () => {
+    if (selected.size === documents.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(documents.map((d) => d.id)));
+    }
   };
 
-  const selectedCount = selected.size;
+  const handleDownload = (doc: Document) => {
+    window.open(doc.url, "_blank", "noopener,noreferrer");
+  };
 
-  const handleDownload = () => {
-    toast.success(`${selectedCount} Dokument(e) werden heruntergeladen...`, {
-      description: `RegisterPilot_${company.name.replace(/[^a-zA-Z0-9]/g, "_")}_2026-04-04.zip`,
-    });
+  const handleDownloadSelected = () => {
+    documents
+      .filter((d) => selected.has(d.id))
+      .forEach((d) => window.open(d.url, "_blank", "noopener,noreferrer"));
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
-        <ArrowLeft className="h-4 w-4" /> Zurück zur Suche
-      </button>
+    <div className="w-full max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Zurück zur Suche
+        </button>
+      </div>
 
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-border">
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <FileText className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">{company.name}</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {company.city} · {company.court} · {company.registerNumber}
-              </p>
-              <span className={`inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[company.status]}`}>
-                {company.status}
+      <div className="rounded-lg border border-border bg-card p-6">
+        {/* Company header */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold">{company.name}</h2>
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+            {company.city && <span>{company.city}</span>}
+            {company.register_number && (
+              <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                {company.register_number}
               </span>
-            </div>
+            )}
+            {company.court && <span>{company.court}</span>}
+          </p>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Dokumente werden geladen...</span>
           </div>
-        </div>
+        )}
 
-        {/* Documents */}
-        <div className="px-6 py-4">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Verfügbare Dokumente</h3>
-
-          <div className="space-y-1">
-            {documents.map(doc => (
-              <DocumentRow
-                key={doc.id}
-                doc={doc}
-                selected={selected}
-                expanded={expanded}
-                onToggle={toggleDoc}
-                onExpand={toggleExpand}
-              />
-            ))}
+        {/* Error */}
+        {error && !loading && (
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm">{error}</p>
           </div>
-        </div>
+        )}
 
-        {/* Actions */}
-        <div className="px-6 py-5 border-t border-border bg-muted/30 space-y-3">
-          <Button onClick={handleDownload} disabled={selectedCount === 0} className="w-full h-12 text-base gap-2">
-            <Download className="h-5 w-5" />
-            Ausgewählte Dokumente herunterladen ({selectedCount})
-          </Button>
-          <Button variant="outline" onClick={handleDownload} className="w-full h-11 gap-2">
-            <Package className="h-4 w-4" />
-            Alles herunterladen als ZIP
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DocumentRow({ doc, selected, expanded, onToggle, onExpand }: {
-  doc: RegisterDocument;
-  selected: Set<string>;
-  expanded: Set<string>;
-  onToggle: (id: string) => void;
-  onExpand: (id: string) => void;
-}) {
-  const hasSubs = doc.subDocuments && doc.subDocuments.length > 0;
-  const isExpanded = expanded.has(doc.id);
-
-  return (
-    <div>
-      <div className="flex items-center gap-3 py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-        <Checkbox checked={selected.has(doc.id)} onCheckedChange={() => onToggle(doc.id)} />
-        {hasSubs ? (
-          <button onClick={() => onExpand(doc.id)} className="text-muted-foreground hover:text-foreground">
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
-        ) : <div className="w-4" />}
-        <FileText className="h-4 w-4 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-foreground">{doc.label}</span>
-        </div>
-        {doc.meta && <span className="text-xs text-muted-foreground whitespace-nowrap">{doc.meta}</span>}
-      </div>
-
-      {hasSubs && isExpanded && (
-        <div className="ml-14 border-l-2 border-border pl-4 pb-1">
-          {doc.subDocuments!.map(sub => (
-            <div key={sub.id} className="flex items-center gap-3 py-2 px-2 rounded-md hover:bg-muted/40 transition-colors">
-              <Checkbox checked={selected.has(sub.id)} onCheckedChange={() => onToggle(sub.id)} />
-              <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-sm text-foreground">{sub.label}</span>
+        {/* Document list */}
+        {!loading && !error && documents.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleAll}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {selected.size === documents.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  Alle auswahlen
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {documents.length} Dokument{documents.length !== 1 ? "e" : ""}
+                  {source === "cache" && " (gecacht)"}
+                </span>
+              </div>
+              {selected.size > 0 && (
+                <button
+                  onClick={handleDownloadSelected}
+                  className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {selected.size} herunterladen
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+
+            <ul className="space-y-2">
+              {documents.map((doc) => (
+                <li
+                  key={doc.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors group"
+                >
+                  <button onClick={() => toggleSelect(doc.id)} className="shrink-0">
+                    {selected.has(doc.id) ? (
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Square className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{doc.label}</div>
+                    <div className="text-xs text-muted-foreground">{doc.meta}</div>
+                  </div>
+                  <button
+                    onClick={() => handleDownload(doc)}
+                    className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-accent transition-all"
+                    title="Herunterladen"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {/* Empty state */}
+        {!loading && !error && documents.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <FileText className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Keine Dokumente gefunden.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
