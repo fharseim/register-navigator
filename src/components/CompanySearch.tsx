@@ -41,12 +41,12 @@ export default function CompanySearch({ onSelect }: CompanySearchProps) {
         body: { query: q },
       });
       if (error) throw error;
-      const companies: Company[] = (data?.results || []).map((r: any) => ({
+      const companies: Company[] = (data?.companies || []).map((r: any) => ({
         id: r.id,
         name: r.name,
         city: r.city,
         court: r.court,
-        register_number: r.register_number,
+        register_number: r.register_number
         legal_form: r.legal_form,
         status: r.status || "aktiv",
       }));
